@@ -151,7 +151,6 @@ ASCII_LOGO = r"""
 ██║░░░░░██║░░░██║██╔═══╝░██║░░░██║░╚═══██╗
 ███████╗╚██████╔╝██║░░░░░╚██████╔╝██████╔╝
 ╚══════╝░╚═════╝░╚═╝░░░░░░╚═════╝░╚═════╝░
-          WMI Control Center
 """
 
 
@@ -594,7 +593,6 @@ class ExcaliburApp(App):
 
     def _build_dashboard(self) -> Widget:
         return Vertical(
-            LogoWidget(),
             Static("Fan Speeds", classes="bold muted"),
             Horizontal(
                 FanGauge("𖣘  CPU Fan", id="cpu-gauge"),
@@ -629,11 +627,11 @@ class ExcaliburApp(App):
         return Vertical(
             Static(ASCII_LOGO),
             Static(
-                f"[bold]excalibur-wmi[/bold] Control Center\n\n"
+                f"[bold]Excalibur-WMI[/bold] Control Center\n\n"
                 f"  Driver status : {driver_present}\n"
                 f"  hwmon path    : [cyan]{hwmon}[/cyan]\n"
                 f"  LED base      : [cyan]{LED_BASE}/excalibur::kbd_backlight-*[/cyan]\n\n"
-                "[dim]Source: github.com/solzic0/excalibur-vmi-lupus\n"
+                "[dim]Source: github.com/TeknoAnka/excalibur-vmi-lupus\n"
                 "License: GPL-2.0-or-later[/dim]"
             ),
             id="about-container",
