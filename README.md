@@ -502,12 +502,12 @@ sudo systemctl enable --now excalibur.service
 
 ## Control Panel
 
-A Textual-based TUI control center is provided in `control-panel.py` for interactive management of lighting, power plans, and fan monitoring.
+A PyQt6-based GUI control center is provided in `control-panel.py` for interactive management of lighting, power plans, and fan monitoring.
 
 **Requirements:**
 
 ```bash
-pip install textual
+pip install PyQt6
 ```
 
 **Running the control panel:**
@@ -582,7 +582,7 @@ If the control panel is run without sudo, a warning bar appears at the top indic
 
 **Building from Source:**
 
-The control panel is a standalone Python script with no compilation step. Simply ensure Textual is installed and run directly.
+The control panel is a standalone Python script with no compilation step. Simply ensure PyQt6 is installed and run directly.
 
 ---
 
