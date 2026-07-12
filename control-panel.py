@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-control-panel-qt.py — PyQt6 GUI control center for the excalibur-wmi kernel driver.
+control-panel.py — PyQt6 GUI control center for the excalibur-wmi kernel driver.
 
 Requires:
     pip install PyQt6
 
 Run:
-    sudo python3 control-panel-qt.py
+    sudo python3 control-panel.py
 """
 
 import sys
@@ -17,10 +17,11 @@ from dataclasses import dataclass, field
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QComboBox, QFrame, QTabWidget, QScrollArea,
-    QGridLayout, QSizePolicy
+    QGridLayout, QSizePolicy, QSystemTrayIcon, QMenu
 )
-from PyQt6.QtCore import QTimer, Qt, pyqtSignal
-from PyQt6.QtGui import QFont, QColor, QPalette, QBrush, QPixmap, QImage
+from PyQt6.QtCore import QTimer, Qt, pyqtSignal, QSettings
+from PyQt6.QtGui import QFont, QColor, QPalette, QBrush, QPixmap, QImage, QIcon, QAction
+from PyQt6.QtNetwork import QLocalServer, QLocalSocket
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Sysfs helpers (Ported from original)
@@ -82,17 +83,73 @@ def get_available_modes(zone: str = "left") -> list[str]:
         return raw.split()
     return ["off", "static", "blink", "fade", "heartbeat", "wave", "random", "rainbow"]
 
+def get_user_home() -> str:
+    sudo_user = os.environ.get("SUDO_USER")
+    if sudo_user:
+        try:
+            import pwd
+            return pwd.getpwnam(sudo_user).pw_dir
+        except Exception:
+            return os.path.expanduser(f"~{sudo_user}")
+    return os.path.expanduser("~")
+
+def get_icon() -> QIcon:
+    local_logo = Path(__file__).parent / "logo.png"
+    if local_logo.exists():
+        return QIcon(str(local_logo))
+    installed_logo = Path("/opt/excalibur-panel/logo.png")
+    if installed_logo.exists():
+        return QIcon(str(installed_logo))
+    icon = QIcon.fromTheme("excalibur-panel")
+    if not icon.isNull():
+        return icon
+    icon = QIcon.fromTheme("input-keyboard")
+    if not icon.isNull():
+        return icon
+    pixmap = QPixmap(32, 32)
+    pixmap.fill(QColor("cyan"))
+    return QIcon(pixmap)
+
+class SingleInstanceHelper:
+    def __init__(self, app_name):
+        self.app_name = app_name
+        self.server = None
+
+    def try_raise_existing(self, args):
+        socket = QLocalSocket()
+        socket.connectToServer(self.app_name)
+        if socket.waitForConnected(500):
+            message = "show"
+            if "--minimized" in args or "-m" in args:
+                message = "minimized"
+            socket.write(message.encode('utf-8'))
+            socket.waitForBytesWritten(500)
+            socket.disconnectFromServer()
+            return True
+        return False
+
+    def start_server(self, window):
+        QLocalServer.removeServer(self.app_name)
+        self.server = QLocalServer()
+        self.server.newConnection.connect(lambda: self.on_new_connection(window))
+        self.server.listen(self.app_name)
+
+    def on_new_connection(self, window):
+        socket = self.server.nextPendingConnection()
+        if socket:
+            if socket.waitForReadyRead(500):
+                message = socket.readAll().data().decode('utf-8')
+                if message == "show":
+                    window.show_and_activate()
+            socket.disconnectFromServer()
+
 # ─────────────────────────────────────────────────────────────────────────────
 # UI Constants & Styles
 # ─────────────────────────────────────────────────────────────────────────────
 
 ASCII_LOGO = r"""
-██╗░░░░░██╗░░░██╗██████╗░██╗░░░██╗░██████╗
-██║░░░░░██║░░░██║██╔══██╗██║░░░██║██╔════╝
-██║░░░░░██║░░░██║██████╔╝██║░░░██║╚█████╗░
-██║░░░░░██║░░░██║██╔═══╝░██║░░░██║░╚═══██╗
-███████╗╚██████╔╝██║░░░░░╚██████╔╝██████╔╝
-╚══════╝░╚═════╝░╚═╝░░░░░░╚═════╝░╚═════╝░
+▀█▀ █▀▀ █▄▀ █▄░█ █▀█ ▄▀█ █▄░█ █▄▀ ▄▀█
+░█░ ██▄ █░█ █░▀█ █▄█ █▀█ █░▀█ █░█ █▀█
 """
 
 STYLESHEET = """
@@ -266,12 +323,17 @@ class ExcaliburControlPanel(QMainWindow):
         super().__init__()
         self.setWindowTitle("LupuS Excalibur WMI Control Center")
         self.setFixedSize(1000, 700)
+        self.setWindowIcon(get_icon())
         
         self.hwmon_path = find_hwmon_path()
         self.modes = get_available_modes()
         self.selected_color = "FFFFFF"
         self.selected_brightness = 2
         self.swatches = {}
+
+        self.settings = QSettings("LupuS", "ExcaliburControlPanel")
+        self.close_to_tray = self.settings.value("close_to_tray", True, type=bool)
+        self.setup_tray_icon()
 
         self.init_ui()
         self.setStyleSheet(STYLESHEET)
@@ -302,7 +364,7 @@ class ExcaliburControlPanel(QMainWindow):
         # Tab 3: Power
         self.tabs.addTab(self.create_power_tab(), "Power Plan")
         
-        # Tab 4: About
+        # Tab 5: About
         self.tabs.addTab(self.create_about_tab(), "About")
 
         self.status_bar = QLabel("Ready")
@@ -586,15 +648,88 @@ class ExcaliburControlPanel(QMainWindow):
         self.status_bar.setStyleSheet(f"color: {color}; font-weight: bold; padding: 5px;")
         QTimer.singleShot(3000, lambda: self.status_bar.setStyleSheet("color: #888; padding: 5px;"))
 
+    def setup_tray_icon(self):
+        self.tray_icon = QSystemTrayIcon(self)
+        self.tray_icon.setIcon(get_icon())
+        self.tray_icon.setToolTip("Control Center")
+        
+        tray_menu = QMenu(self)
+        show_action = QAction("Show", self)
+        show_action.triggered.connect(self.show_and_activate)
+        tray_menu.addAction(show_action)
+        
+        hide_action = QAction("Hide", self)
+        hide_action.triggered.connect(self.hide)
+        tray_menu.addAction(hide_action)
+        
+        tray_menu.addSeparator()
+        
+        quit_action = QAction("Exit", self)
+        quit_action.triggered.connect(self.quit_app)
+        tray_menu.addAction(quit_action)
+        
+        self.tray_icon.setContextMenu(tray_menu)
+        self.tray_icon.activated.connect(self.on_tray_activated)
+        self.tray_icon.show()
+
+    def on_tray_activated(self, reason):
+        if reason == QSystemTrayIcon.ActivationReason.Trigger:
+            if self.isVisible():
+                self.hide()
+            else:
+                self.show_and_activate()
+
+    def show_and_activate(self):
+        self.show()
+        self.showNormal()
+        self.raise_()
+        self.activateWindow()
+
+    def quit_app(self):
+        self.really_quit = True
+        self.close()
+        QApplication.quit()
+
+    def closeEvent(self, event):
+        if self.close_to_tray and hasattr(self, "tray_icon") and self.tray_icon.isVisible() and not getattr(self, "really_quit", False):
+            event.ignore()
+            self.hide()
+            self.tray_icon.showMessage(
+                "Control Center",
+                "The app continues to run in the background.",
+                QSystemTrayIcon.MessageIcon.Information,
+                2000
+            )
+        else:
+            event.accept()
+
 if __name__ == "__main__":
+    try:
+        import setproctitle
+        setproctitle.setproctitle("excalibur-control-panel")
+    except ImportError:
+        pass
+
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
     
+    app.setApplicationName("Excalibur Control Center")
+    # Single instance check
+    helper = SingleInstanceHelper("excalibur_control_panel_socket")
+    if helper.try_raise_existing(sys.argv):
+        print("Another instance is already running. Exiting.")
+        sys.exit(0)
+        
     # Check driver
     led_glob = glob.glob(f"{LED_BASE}/excalibur::kbd_backlight-*")
     if not led_glob and not find_hwmon_path():
         print("Warning: excalibur-wmi driver not found.")
         
     window = ExcaliburControlPanel()
-    window.show()
+    helper.start_server(window)
+    
+    # Check if starting minimized
+    if "--minimized" not in sys.argv and "-m" not in sys.argv:
+        window.show()
+        
     sys.exit(app.exec())

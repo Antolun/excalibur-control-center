@@ -33,10 +33,12 @@ INSTALL_DIR="${LIB_MODULES}/extra"
 MODULES_LOAD_DIR="/etc/modules-load.d"
 DKMS_SRC_DIR="/usr/src/${DKMS_NAME}-${DKMS_VERSION}"
 CONTROL_PANEL_SRC="control-panel.py"
-CONTROL_PANEL_DEST="/usr/local/lib/excalibur-control-panel.py"
+CONTROL_PANEL_DEST="/opt/excalibur-panel/control-panel.py"
 CONTROL_PANEL_BIN="/usr/local/bin/excalibur-panel"
 UDEV_RULES_FILE="/etc/udev/rules.d/99-excalibur.rules"
 DESKTOP_FILE="/usr/share/applications/excalibur-panel.desktop"
+ICON_SRC="logo.png"
+ICON_DEST="/opt/excalibur-panel/logo.png"
 INITRAMFS_CMD=""
 PYTHON_BIN="python3"
 PKG_INSTALL=""
@@ -91,18 +93,23 @@ detect_distro() {
         DISTRO_NAME="${PRETTY_NAME:-unknown}"
     fi
     case "$DISTRO_ID" in
-        arch|manjaro|endeavouros|cachyos)
+        arch|manjaro|endeavouros|cachyos|lupus)
             INITRAMFS_CMD="mkinitcpio -P"
             PKG_INSTALL="pacman -S --noconfirm"
             HEADERS_PKG="linux-headers"
             ;;
+        pisi)
+            INITRAMFS_CMD="mkinitcpio -P"
+            PKG_INSTALL="pisi -S --yes-all"
+            HEADERS_PKG="linux-headers"
+            ;;
         ubuntu|debian|linuxmint|pop)
-            INITRAMFS_CMD="update-initramfs -u"
+            INITRAMFS_CMD="update-initramfs -u -k all"
             PKG_INSTALL="apt-get install -y"
             HEADERS_PKG="linux-headers-$(uname -r)"
             ;;
         fedora|centos|rhel|rocky|almalinux)
-            INITRAMFS_CMD="dracut --force"
+            INITRAMFS_CMD="dracut --force --regenerate-all"
             PKG_INSTALL="dnf install -y"
             HEADERS_PKG="kernel-devel"
             ;;
@@ -119,9 +126,8 @@ detect_distro() {
 }
 
 # ── Compiler detection ────────────────────────────────────────────────────────
-# Read /proc/version to match the compiler that built the running kernel.
-# Building with a different compiler than the host kernel risks ABI issues;
-# this is the root cause of install failures on CachyOS (clang-built by default).
+# Detect which compiler built the *running* kernel (for pre-flight checks and
+# fallback).  Per-kernel detection happens inside detect_compiler_for_kver().
 detect_compiler() {
     if grep -q "clang" /proc/version 2>/dev/null; then
         COMPILER="clang"
@@ -134,38 +140,126 @@ detect_compiler() {
     fi
 }
 
+# Detect the compiler used to build a *specific* kernel version.
+# Outputs: sets local variables KVER_COMPILER and KVER_MAKE_FLAGS.
+# Strategy (in order):
+#   1. Read CC_VERSION_TEXT from the kernel .config
+#   2. Read version.signature from the kernel build dir
+#   3. Fall back to the global COMPILER/MAKE_FLAGS detected from /proc/version
+detect_compiler_for_kver() {
+    local kver="$1"
+    local kbuild="/lib/modules/${kver}/build"
+    KVER_COMPILER="$COMPILER"
+    KVER_MAKE_FLAGS="$MAKE_FLAGS"
+
+    # Try the kernel .config first (most reliable)
+    local cfg="${kbuild}/.config"
+    if [[ ! -f "$cfg" ]]; then
+        cfg="/boot/config-${kver}"
+    fi
+    if [[ -f "$cfg" ]]; then
+        local cc_ver
+        cc_ver=$(grep -m1 '^CONFIG_CC_VERSION_TEXT=' "$cfg" 2>/dev/null \
+                 | sed 's/CONFIG_CC_VERSION_TEXT=//;s/"//g' || true)
+        if [[ "$cc_ver" == *clang* ]]; then
+            KVER_COMPILER="clang"
+            KVER_MAKE_FLAGS="CC=clang LLVM=1 LLVM_IAS=1"
+            return
+        elif [[ -n "$cc_ver" ]]; then
+            KVER_COMPILER="gcc"
+            KVER_MAKE_FLAGS=""
+            return
+        fi
+    fi
+
+    # Fallback: check version.signature in the build dir
+    local ver_sig="${kbuild}/version.signature"
+    if [[ -f "$ver_sig" ]]; then
+        if grep -q "clang" "$ver_sig" 2>/dev/null; then
+            KVER_COMPILER="clang"
+            KVER_MAKE_FLAGS="CC=clang LLVM=1 LLVM_IAS=1"
+            return
+        else
+            KVER_COMPILER="gcc"
+            KVER_MAKE_FLAGS=""
+            return
+        fi
+    fi
+
+    # Last resort: check include/generated/compile.h (present in some trees)
+    local compile_h="${kbuild}/include/generated/compile.h"
+    if [[ -f "$compile_h" ]]; then
+        if grep -q "clang" "$compile_h" 2>/dev/null; then
+            KVER_COMPILER="clang"
+            KVER_MAKE_FLAGS="CC=clang LLVM=1 LLVM_IAS=1"
+            return
+        else
+            KVER_COMPILER="gcc"
+            KVER_MAKE_FLAGS=""
+            return
+        fi
+    fi
+
+    # Could not determine — keep the global default
+}
+
 # ── Pre-flight checks ─────────────────────────────────────────────────────────
 check_build_tools() {
     local missing=()
 
-    if [[ "$COMPILER" == "clang" ]]; then
-        command -v clang   &>/dev/null || missing+=("clang")
-        command -v make    &>/dev/null || missing+=("make")
-        command -v llvm-ar &>/dev/null || missing+=("llvm")
-        if [[ ${#missing[@]} -gt 0 ]]; then
-            err "Missing build tools for clang build: ${missing[*]}"
-            [[ -n "$PKG_INSTALL" ]] && info "Install with: ${PKG_INSTALL} clang llvm make"
-            return 1
-        fi
+    # Always require make
+    command -v make &>/dev/null || missing+=("make")
+
+    # Check for clang+llvm (needed if any kernel was built with clang)
+    local have_clang=true
+    if ! command -v clang   &>/dev/null; then have_clang=false; fi
+    if ! command -v llvm-ar &>/dev/null; then have_clang=false; fi
+
+    # Check for gcc (needed if any kernel was built with gcc)
+    local have_gcc=true
+    if ! command -v gcc &>/dev/null; then have_gcc=false; fi
+
+    if [[ ${#missing[@]} -gt 0 ]]; then
+        err "Missing required build tool: ${missing[*]}"
+        return 1
+    fi
+
+    if [[ "$have_clang" == true && "$have_gcc" == true ]]; then
+        ok "Build tools present (clang, llvm, gcc, make)"
+    elif [[ "$have_clang" == true ]]; then
         ok "Build tools present (clang, llvm, make)"
+        warn "gcc not found — kernels built with GCC will be skipped"
+    elif [[ "$have_gcc" == true ]]; then
+        ok "Build tools present (gcc, make)"
+        warn "clang/llvm not found — kernels built with clang will be skipped"
     else
-        command -v make &>/dev/null || missing+=("make")
-        command -v gcc  &>/dev/null || missing+=("gcc")
-        if [[ ${#missing[@]} -gt 0 ]]; then
-            err "Missing build tools: ${missing[*]}"
-            [[ -n "$PKG_INSTALL" ]] && info "Install with: ${PKG_INSTALL} ${missing[*]}"
-            return 1
-        fi
-        ok "Build tools present (make, gcc)"
+        err "Neither clang nor gcc found — cannot build the module"
+        return 1
     fi
 }
 
+get_kernels_with_headers() {
+    local kvers=()
+    for kdir in /lib/modules/*; do
+        if [[ -d "$kdir" ]]; then
+            local kver
+            kver=$(basename "$kdir")
+            if [[ -d "/lib/modules/${kver}/build" ]]; then
+                kvers+=("$kver")
+            fi
+        fi
+    done
+    echo "${kvers[@]}"
+}
+
 check_kernel_headers() {
-    if [[ -d "${LIB_MODULES}/build" ]]; then
-        ok "Kernel headers found"
+    local kernels
+    kernels=($(get_kernels_with_headers))
+    if [[ ${#kernels[@]} -gt 0 ]]; then
+        ok "Kernel headers found for: ${kernels[*]}"
         return 0
     fi
-    err "Kernel headers not found at ${LIB_MODULES}/build"
+    err "Kernel headers not found for any installed kernel at /lib/modules/*/build"
     if [[ "$DISTRO_ID" =~ ^(arch|manjaro|endeavouros|cachyos)$ ]]; then
         local kernel_pkg
         kernel_pkg=$(pacman -Qo "${LIB_MODULES}" 2>/dev/null | awk '{print $NF}' || true)
@@ -245,30 +339,55 @@ install_pyqt6() {
 
 # ── Driver — manual build/install/uninstall ───────────────────────────────────
 build_driver() {
-    step "Building kernel module (compiler: ${COMPILER})"
+    local kver="${1:-$(uname -r)}"
+
+    # Detect the compiler that built THIS specific kernel
+    detect_compiler_for_kver "${kver}"
+
+    step "Building kernel module for ${kver} (compiler: ${KVER_COMPILER})"
     if [[ ! -f "excalibur.c" || ! -f "Makefile" ]]; then
         err "excalibur.c or Makefile not found in $(pwd)"
         info "Run this script from the excalibur source directory."
         exit 1
     fi
-    # shellcheck disable=SC2086
-    make clean $MAKE_FLAGS 2>/dev/null || true
-    # shellcheck disable=SC2086
-    if make $MAKE_FLAGS; then
-        ok "Module built: ${KO_FILE}"
+
+    # Verify the required compiler is actually available
+    if [[ "$KVER_COMPILER" == "clang" ]]; then
+        if ! command -v clang &>/dev/null || ! command -v llvm-ar &>/dev/null; then
+            warn "clang/llvm not found — skipping ${kver} (install clang and llvm to build for this kernel)"
+            return 1
+        fi
     else
-        err "Build failed"
-        exit 1
+        if ! command -v gcc &>/dev/null; then
+            warn "gcc not found — skipping ${kver} (install gcc to build for this kernel)"
+            return 1
+        fi
     fi
+
+    # shellcheck disable=SC2086
+    make clean ${KVER_MAKE_FLAGS} KDIR="/lib/modules/${kver}/build" 2>/dev/null || true
+    # shellcheck disable=SC2086
+    if make ${KVER_MAKE_FLAGS} KDIR="/lib/modules/${kver}/build"; then
+        ok "Module built for ${kver}: ${KO_FILE}"
+        return 0
+    else
+        err "Build failed for ${kver}"
+        return 1
+    fi
+
 }
 
 install_driver() {
-    step "Installing kernel module"
-    mkdir -p "${INSTALL_DIR}"
-    cp "${KO_FILE}" "${INSTALL_DIR}/"
-    depmod -a
-    ok "Module installed: ${INSTALL_DIR}/${KO_FILE}"
+    local kver="${1:-$(uname -r)}"
+    local inst_dir="/lib/modules/${kver}/extra"
+    step "Installing kernel module for ${kver}"
+    mkdir -p "${inst_dir}"
+    cp "${KO_FILE}" "${inst_dir}/"
+    depmod -a "${kver}"
+    ok "Module installed: ${inst_dir}/${KO_FILE}"
+}
 
+post_install_driver() {
     step "Configuring auto-load at boot"
     mkdir -p "${MODULES_LOAD_DIR}"
     echo "${MODULE_NAME}" > "${MODULES_LOAD_DIR}/${MODULE_NAME}.conf"
@@ -281,20 +400,52 @@ install_driver() {
 
     step "Loading module"
     if modprobe "${MODULE_NAME}"; then
-        ok "Module loaded"
+        ok "Module loaded on running kernel"
     else
         warn "modprobe failed — check: sudo dmesg | grep excalibur"
     fi
+}
+
+install_manual_driver() {
+    local kernels
+    kernels=($(get_kernels_with_headers))
+    if [[ ${#kernels[@]} -eq 0 ]]; then
+        err "No kernel headers found. Cannot build module."
+        exit 1
+    fi
+
+    local compiled_count=0
+    for kver in "${kernels[@]}"; do
+        if build_driver "${kver}"; then
+            install_driver "${kver}"
+            compiled_count=$((compiled_count + 1))
+        else
+            warn "Failed to build module for kernel ${kver}"
+        fi
+    done
+
+    if [[ $compiled_count -eq 0 ]]; then
+        err "Failed to build module for any kernel."
+        exit 1
+    fi
+
+    post_install_driver
 }
 
 uninstall_driver() {
     step "Unloading kernel module"
     rmmod "${MODULE_NAME}" 2>/dev/null && ok "Module unloaded" || warn "Module was not loaded"
 
-    step "Removing files"
+    step "Removing files from all kernels"
+    for kdir in /lib/modules/*; do
+        if [[ -d "$kdir" ]]; then
+            local kver
+            kver=$(basename "$kdir")
+            rm -f "/lib/modules/${kver}/extra/${KO_FILE}"
+            depmod -a "${kver}" 2>/dev/null || true
+        fi
+    done
     rm -f "${MODULES_LOAD_DIR}/${MODULE_NAME}.conf"
-    rm -f "${INSTALL_DIR}/${KO_FILE}"
-    depmod -a
     ok "Driver files removed"
 
     if [[ -n "${INITRAMFS_CMD}" ]]; then
@@ -310,44 +461,71 @@ uninstall_driver() {
 # recommended persistent installation method for out-of-tree modules.
 
 install_dkms_driver() {
-    step "Registering ${DKMS_NAME}/${DKMS_VERSION} with DKMS"
+    local kernels
+    kernels=($(get_kernels_with_headers))
+    if [[ ${#kernels[@]} -eq 0 ]]; then
+        err "No kernel headers found. Cannot build via DKMS."
+        exit 1
+    fi
 
-    if dkms status "${DKMS_NAME}/${DKMS_VERSION}" 2>/dev/null | grep -q "installed"; then
-        warn "${DKMS_NAME}/${DKMS_VERSION} is already installed in DKMS."
+    # Check if it's already installed on ALL kernels with headers
+    local all_installed=true
+    for kver in "${kernels[@]}"; do
+        if ! dkms status "${DKMS_NAME}/${DKMS_VERSION}" -k "${kver}" 2>/dev/null | grep -q "installed"; then
+            all_installed=false
+            break
+        fi
+    done
+
+    if [[ "$all_installed" == true ]]; then
+        warn "${DKMS_NAME}/${DKMS_VERSION} is already installed in DKMS for all kernels."
         info "To upgrade: sudo ./install.sh dkms-uninstall && sudo ./install.sh dkms-install"
         return 0
     fi
 
-    # Copy sources into DKMS tree.
-    mkdir -p "${DKMS_SRC_DIR}"
-    for f in excalibur.c Makefile Kconfig dkms.conf; do
-        if [[ -f "$f" ]]; then
-            cp "$f" "${DKMS_SRC_DIR}/"
-        else
-            err "Required file '$f' not found in $(pwd)"
-            exit 1
-        fi
-    done
-    ok "Sources copied to ${DKMS_SRC_DIR}"
+    # Register/add if not already registered
+    if ! dkms status "${DKMS_NAME}/${DKMS_VERSION}" 2>/dev/null | grep -q -E "added|built|installed"; then
+        step "Registering ${DKMS_NAME}/${DKMS_VERSION} with DKMS"
 
-    # Propagate clang flags into dkms.conf if the running kernel uses clang.
-    if [[ "$COMPILER" == "clang" && -n "$MAKE_FLAGS" ]]; then
-        # Append CC/LLVM flags to the MAKE line in the installed dkms.conf.
-        sed -i "s|^MAKE\[0\]=\"make|MAKE[0]=\"make ${MAKE_FLAGS}|" \
-            "${DKMS_SRC_DIR}/dkms.conf"
-        ok "Clang build flags injected into dkms.conf"
+        # Copy sources into DKMS tree.
+        mkdir -p "${DKMS_SRC_DIR}"
+        for f in excalibur.c Makefile Kconfig dkms.conf; do
+            if [[ -f "$f" ]]; then
+                cp "$f" "${DKMS_SRC_DIR}/"
+            else
+                err "Required file '$f' not found in $(pwd)"
+                exit 1
+            fi
+        done
+        ok "Sources copied to ${DKMS_SRC_DIR}"
+
+        # Propagate clang flags into dkms.conf if the running kernel uses clang.
+        if [[ "$COMPILER" == "clang" && -n "$MAKE_FLAGS" ]]; then
+            # Append CC/LLVM flags to the MAKE line in the installed dkms.conf.
+            sed -i "s|^MAKE\[0\]=\"make|MAKE[0]=\"make ${MAKE_FLAGS}|" \
+                "${DKMS_SRC_DIR}/dkms.conf"
+            ok "Clang build flags injected into dkms.conf"
+        fi
+
+        dkms add -m "${DKMS_NAME}" -v "${DKMS_VERSION}"
+        ok "DKMS source registered"
+    else
+        ok "DKMS source already registered"
     fi
 
-    dkms add -m "${DKMS_NAME}" -v "${DKMS_VERSION}"
-    ok "DKMS source registered"
+    for kver in "${kernels[@]}"; do
+        if dkms status "${DKMS_NAME}/${DKMS_VERSION}" -k "${kver}" 2>/dev/null | grep -q "installed"; then
+            ok "Module already installed via DKMS for kernel ${kver}"
+            continue
+        fi
 
-    step "Building module with DKMS (kernel $(uname -r))"
-    dkms build -m "${DKMS_NAME}" -v "${DKMS_VERSION}"
-    ok "Build complete"
+        step "Building module with DKMS (kernel ${kver})"
+        dkms build -m "${DKMS_NAME}" -v "${DKMS_VERSION}" -k "${kver}"
 
-    step "Installing module with DKMS"
-    dkms install -m "${DKMS_NAME}" -v "${DKMS_VERSION}"
-    ok "Module installed via DKMS"
+        step "Installing module with DKMS (kernel ${kver})"
+        dkms install -m "${DKMS_NAME}" -v "${DKMS_VERSION}" -k "${kver}"
+        ok "Module installed via DKMS for ${kver}"
+    done
 
     step "Configuring auto-load at boot"
     mkdir -p "${MODULES_LOAD_DIR}"
@@ -356,7 +534,7 @@ install_dkms_driver() {
 
     step "Loading module"
     if modprobe "${MODULE_NAME}"; then
-        ok "Module loaded"
+        ok "Module loaded on running kernel"
     else
         warn "modprobe failed — check: sudo dmesg | grep excalibur"
     fi
@@ -429,6 +607,13 @@ install_control_panel() {
     chmod 644 "${CONTROL_PANEL_DEST}"
     ok "Control panel source: ${CONTROL_PANEL_DEST}"
 
+    if [[ -f "${ICON_SRC}" ]]; then
+        mkdir -p "$(dirname "${ICON_DEST}")"
+        cp "${ICON_SRC}" "${ICON_DEST}"
+        chmod 644 "${ICON_DEST}"
+        ok "Icon installed: ${ICON_DEST}"
+    fi
+
     cat > "${CONTROL_PANEL_BIN}" <<LAUNCHER
 #!/bin/bash
 # Excalibur Control Panel launcher — auto-generated by installer
@@ -440,7 +625,8 @@ LAUNCHER
 
 uninstall_control_panel() {
     step "Removing control panel"
-    rm -f "${CONTROL_PANEL_DEST}" "${CONTROL_PANEL_BIN}" "${DESKTOP_FILE}"
+    rm -f "${CONTROL_PANEL_DEST}" "${CONTROL_PANEL_BIN}" "${DESKTOP_FILE}" "${ICON_DEST}"
+    rmdir "/opt/excalibur-panel" 2>/dev/null || true
     ok "Control panel removed"
 }
 
@@ -451,12 +637,12 @@ install_desktop_entry() {
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=Excalibur Control Panel
-GenericName=Laptop Control Panel
+Name=Excalibur Control Center
+GenericName=Excalibur VMI Driver Controller
 Comment=RGB lighting, fan monitoring and power plan control for Excalibur laptops
 Exec=bash -c 'exec ${PYTHON_BIN} ${CONTROL_PANEL_DEST}'
-Icon=input-keyboard
-Terminal=true
+Icon=/opt/excalibur-panel/logo.png
+Terminal=false
 Categories=System;HardwareSettings;
 Keywords=excalibur;rgb;keyboard;fan;laptop;
 StartupNotify=false
@@ -605,8 +791,7 @@ interactive_install() {
         if [[ "$USE_DKMS" == true ]]; then
             install_dkms_driver
         else
-            build_driver
-            install_driver
+            install_manual_driver
         fi
     fi
     [[ "$INSTALL_PYQT6" == true ]] && install_pyqt6
@@ -665,8 +850,7 @@ case "${1:-}" in
         check_kernel_headers || exit 1
         check_python         || exit 1
         check_pyqt6        || install_pyqt6
-        build_driver
-        install_driver
+        install_manual_driver
         install_control_panel
         install_udev_rules
         install_desktop_entry
