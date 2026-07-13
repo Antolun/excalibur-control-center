@@ -99,7 +99,7 @@ detect_distro() {
             HEADERS_PKG="linux-headers"
             ;;
         pisi|lupus)
-            INITRAMFS_CMD="mkinitcpio -P"
+            INITRAMFS_CMD="mkinitramfs"
             PKG_INSTALL="pisi -S --yes-all"
             HEADERS_PKG="linux-headers"
             ;;
