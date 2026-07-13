@@ -555,7 +555,7 @@ sudo python3 control-panel.py
 
 ### About Tab
 
-- **System Information:** Displays driver load status, hwmon device path, and LED base directory for diagnostic purposes.
+- **Panel Information:** Displays driver load status, hwmon device path, and LED base directory for diagnostic purposes.
 - **Source and License:** Quick reference to repository and MIT license.
 
 **Keyboard Shortcuts:**
