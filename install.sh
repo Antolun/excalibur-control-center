@@ -93,12 +93,12 @@ detect_distro() {
         DISTRO_NAME="${PRETTY_NAME:-unknown}"
     fi
     case "$DISTRO_ID" in
-        arch|manjaro|endeavouros|cachyos|lupus)
+        arch|manjaro|endeavouros|cachyos)
             INITRAMFS_CMD="mkinitcpio -P"
             PKG_INSTALL="pacman -S --noconfirm"
             HEADERS_PKG="linux-headers"
             ;;
-        pisi)
+        pisi|lupus)
             INITRAMFS_CMD="mkinitcpio -P"
             PKG_INSTALL="pisi -S --yes-all"
             HEADERS_PKG="linux-headers"
