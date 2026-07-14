@@ -1,6 +1,6 @@
 ### NOTE: If your computer's brand is Excalibur, LupuS will automatically install this driver!
 # Excalibur-VMI Driver for LupuS
-<img src="https://i.imgur.com/zsI5FVi.png">
+<img src="https://i.imgur.com/b5ziXad.png">
 Linux kernel WMI driver for Excalibur gaming laptops.  
 Provides per-zone RGB keyboard control, fan speed monitoring, and power plan management via the ACPI/WMI interface.
 
