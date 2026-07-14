@@ -323,7 +323,7 @@ TRANSLATIONS = {
         "Random": "Rastgele",
         "Rainbow": "Gökkuşağı",
         "Thermal Sync": "Termal Senkronizasyon",
-        "LupuS Excalibur WMI Control Center": "LupuS Excalibur WMI Kontrol Merkezi",
+        "AppTitle": "Excalibur Control Center",
 
         # Color names
         "Red": "Kırmızı",
@@ -821,14 +821,14 @@ def get_temperatures() -> tuple[int, int]:
 
 def is_autostart_enabled() -> bool:
     try:
-        autostart_file = Path(get_user_home()) / ".config" / "autostart" / "excalibur-panel.desktop"
+        autostart_file = Path(get_user_home()) / ".config" / "autostart" / "excalibur-control-center.desktop"
         return autostart_file.exists()
     except Exception:
         return False
 
 def set_autostart(enabled: bool):
     autostart_dir = Path(get_user_home()) / ".config" / "autostart"
-    autostart_file = autostart_dir / "excalibur-panel.desktop"
+    autostart_file = autostart_dir / "excalibur-control-center.desktop"
     if enabled:
         try:
             autostart_dir.mkdir(parents=True, exist_ok=True)
@@ -1996,7 +1996,7 @@ class VirtualKeyboard(QWidget):
 class ExcaliburControlPanel(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("LupuS Excalibur WMI Control Center")
+        self.setWindowTitle(tr("AppTitle"))
         self.setFixedSize(1200, 850)
         self.setWindowIcon(get_icon())
         
@@ -2925,7 +2925,7 @@ class ExcaliburControlPanel(QMainWindow):
         errors = []
         
         # Handle software modes
-        if mode == "thermal sync":
+        if mode == "thermal_sync":
             for z in zones_to_write:
                 self.active_software_modes[z] = "thermal_sync"
             mode_to_write = "static"
@@ -2935,7 +2935,7 @@ class ExcaliburControlPanel(QMainWindow):
             mode_to_write = mode
             
         for z in zones_to_write:
-            if mode == "thermal sync":
+            if mode == "thermal_sync":
                 cpu_temp, gpu_temp = get_temperatures()
                 max_t = max(cpu_temp, gpu_temp)
                 if max_t < 55:

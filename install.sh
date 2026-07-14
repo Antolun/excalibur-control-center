@@ -36,7 +36,8 @@ CONTROL_PANEL_SRC="control-panel.py"
 CONTROL_PANEL_DEST="/opt/excalibur-panel/control-panel.py"
 CONTROL_PANEL_BIN="/usr/local/bin/excalibur-panel"
 UDEV_RULES_FILE="/etc/udev/rules.d/99-excalibur.rules"
-DESKTOP_FILE="/usr/share/applications/excalibur-panel.desktop"
+DESKTOP_FILE="/usr/share/applications/excalibur-control-center.desktop"
+HOME_DESKTOP_FILE="/home/$USER/.local/share/applications/excalibur-control-center.desktop"
 ICON_SRC="logo.png"
 ICON_DEST="/opt/excalibur-panel/logo.png"
 INITRAMFS_CMD=""
@@ -625,7 +626,7 @@ LAUNCHER
 
 uninstall_control_panel() {
     step "Removing control panel"
-    rm -f "${CONTROL_PANEL_DEST}" "${CONTROL_PANEL_BIN}" "${DESKTOP_FILE}" "${ICON_DEST}"
+    rm -f "${CONTROL_PANEL_DEST}" "${CONTROL_PANEL_BIN}" "${DESKTOP_FILE}" "${ICON_DEST}" "${HOME_DESKTOP_FILE}"
     rmdir "/opt/excalibur-panel" 2>/dev/null || true
     ok "Control panel removed"
 }
@@ -633,6 +634,7 @@ uninstall_control_panel() {
 install_desktop_entry() {
     step "Installing desktop entry"
     mkdir -p "$(dirname "${DESKTOP_FILE}")"
+    mkdir -p "$(dirname "${HOME_DESKTOP_FILE}")"
     cat > "${DESKTOP_FILE}" <<DESKTOP
 [Desktop Entry]
 Version=1.0
@@ -647,7 +649,21 @@ Categories=System;HardwareSettings;
 Keywords=excalibur;rgb;keyboard;fan;laptop;
 StartupNotify=false
 DESKTOP
-    ok "Desktop entry: ${DESKTOP_FILE}"
+    cat > "${HOME_DESKTOP_FILE}" <<DESKTOP
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Excalibur Control Center
+GenericName=Excalibur VMI Driver Controller
+Comment=RGB lighting, fan monitoring and power plan control for Excalibur laptops
+Exec=bash -c 'exec ${PYTHON_BIN} ${CONTROL_PANEL_DEST}'
+Icon=/opt/excalibur-panel/logo.png
+Terminal=false
+Categories=System;HardwareSettings;
+Keywords=excalibur;rgb;keyboard;fan;laptop;
+StartupNotify=false
+DESKTOP
+    ok "Desktop entry: ${DESKTOP_FILE} & ${HOME_DESKTOP_FILE}"
 }
 
 # ── Verify ────────────────────────────────────────────────────────────────────
