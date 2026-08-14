@@ -230,7 +230,7 @@ TRANSLATIONS = {
         "hwmon path:": "hwmon yolu:",
         "LED Base path:": "LED Taban yolu:",
         "Available Modes:": "Kullanılabilir Modlar:",
-        "<b>Excalibur-WMI Control Center</b> is an open-source system utility for Excalibur laptops.<br>Designed to control fan performance curves and RGB lighting zones under Linux.<br><br><span style='color: #8b949e;'>Source Code: github.com/TeknoAnka/excalibur-wmi-lupus<br>License: GPL-2.0-or-later</span>": "<b>Excalibur-WMI Kontrol Merkezi</b>, Excalibur dizüstü bilgisayarlar için açık kaynaklı bir sistem aracıdır.<br>Linux altında fan performans eğrilerini ve RGB aydınlatma bölgelerini kontrol etmek için tasarlanmıştır.<br><br><span style='color: #8b949e;'>Kaynak Kod: github.com/TeknoAnka/excalibur-wmi-lupus<br>Lisans: GPL-2.0-or-later</span>",
+        "<b>Excalibur-WMI Control Center</b> is an open-source system utility for Excalibur laptops.<br>Designed to control fan performance curves and RGB lighting zones under Linux.<br><br><span style='color: #8b949e;'>Source Code: github.com/Antolun/excalibur-wmi-lupus<br>License: GPL-2.0-or-later</span>": "<b>Excalibur-WMI Kontrol Merkezi</b>, Excalibur dizüstü bilgisayarlar için açık kaynaklı bir sistem aracıdır.<br>Linux altında fan performans eğrilerini ve RGB aydınlatma bölgelerini kontrol etmek için tasarlanmıştır.<br><br><span style='color: #8b949e;'>Kaynak Kod: github.com/Antolun/excalibur-wmi-lupus<br>Lisans: GPL-2.0-or-later</span>",
 
         # System Tray Messages & Messages
         "Show": "Göster",
@@ -899,8 +899,10 @@ class SingleInstanceHelper:
 # ─────────────────────────────────────────────────────────────────────────────
 
 ASCII_LOGO = r"""
-▀█▀ █▀▀ █▄▀ █▄░█ █▀█ ▄▀█ █▄░█ █▄▀ ▄▀█
-░█░ ██▄ █░█ █░▀█ █▄█ █▀█ █░▀█ █░█ █▀█
+ ▗▄▖ ▗▖  ▗▖▗▄▄▄▖▗▄▖ ▗▖   ▗▖ ▗▖▗▖  ▗▖
+▐▌ ▐▌▐▛▚▖▐▌  █ ▐▌ ▐▌▐▌   ▐▌ ▐▌▐▛▚▖▐▌
+▐▛▀▜▌▐▌ ▝▜▌  █ ▐▌ ▐▌▐▌   ▐▌ ▐▌▐▌ ▝▜▌
+▐▌ ▐▌▐▌  ▐▌  █ ▝▚▄▞▘▐▙▄▄▖▝▚▄▞▘▐▌  ▐▌
 """
 
 STYLESHEET = """
@@ -2660,7 +2662,7 @@ class ExcaliburControlPanel(QMainWindow):
         footer = QLabel(
             "<b>Excalibur-WMI Control Center</b> is an open-source system utility for Excalibur laptops.<br>"
             "Designed to control fan performance curves and RGB lighting zones under Linux.<br><br>"
-            "<span style='color: #8b949e;'>Source Code: github.com/TeknoAnka/excalibur-wmi-lupus<br>"
+            "<span style='color: #8b949e;'>Source Code: github.com/Antolun/excalibur-wmi-lupus<br>"
             "License: GPL-2.0-or-later</span>"
         )
         footer.setAlignment(Qt.AlignmentFlag.AlignCenter)

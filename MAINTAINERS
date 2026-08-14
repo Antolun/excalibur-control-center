@@ -1,15 +1,16 @@
-	EXCALIBUR WMI DRIVER
-	M:	Solzic0 <solzic0ta@gmail.com>
-	L:	platform-driver-x86@vger.kernel.org
-	S:	Maintained
-	B:	https://github.com/TeknoAnka/excalibur-vmi-lupus/issues
-	T:	git https://github.com/TeknoAnka/excalibur-vmi-lupus.git
-	F:	Documentation/admin-guide/laptops/excalibur-wmi.rst
-	F:	drivers/platform/x86/excalibur-wmi.c
+    EXCALIBUR WMI DRIVER
+    M:	Solzic0 <solzic0ta@gmail.com>
+    L:	platform-driver-x86@vger.kernel.org
+    S:	Maintained
+    B:	https://github.com/Antolun/excalibur-vmi/issues
+    T:	git https://github.com/Antolun/excalibur-vmi.git
+    F:	Documentation/admin-guide/laptops/excalibur-wmi.rst
+    F:	drivers/platform/x86/excalibur-wmi.c
 
---------------------------------------------------------------------------------
-NOTE FOR UPSTREAM SUBMISSION
---------------------------------------------------------------------------------
+---
+
+## NOTE FOR UPSTREAM SUBMISSION
+
 When submitting to the kernel tree:
 
 1. Rename excalibur.c → drivers/platform/x86/excalibur-wmi.c
@@ -26,4 +27,5 @@ When submitting to the kernel tree:
 
 Mailing list archive: https://lore.kernel.org/platform-driver-x86/
 Patch submission guide: Documentation/process/submitting-patches.rst
---------------------------------------------------------------------------------
+
+---

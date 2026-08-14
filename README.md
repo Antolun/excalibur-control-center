@@ -1,7 +1,9 @@
 # This project is no longer in development!
 
 ### NOTE: If your computer's brand is Excalibur, LupuS will automatically install this driver!
+
 # Excalibur-VMI Driver for LupuS
+
 <img src="https://i.imgur.com/b5ziXad.png">
 Linux kernel WMI driver for Excalibur gaming laptops.  
 Provides per-zone RGB keyboard control, fan speed monitoring, and power plan management via the ACPI/WMI interface.
@@ -30,14 +32,14 @@ Provides per-zone RGB keyboard control, fan speed monitoring, and power plan man
 
 ## Supported Models
 
-| Model | BIOS | `has_raw_fanspeed` | Status |
-|---|---|---|---|
-| EXCALIBUR G650 | any | `false` | Supported |
-| EXCALIBUR G670 | any | `false` | Supported |
-| EXCALIBUR G750 | any | `false` | Supported |
-| EXCALIBUR G900 | CP131 | `false` | Supported |
-| EXCALIBUR G870 | CQ141 | `true` | Supported |
-| EXCALIBUR G770 | CP191 | `true` | Supported |
+| Model          | BIOS  | `has_raw_fanspeed` | Status    |
+| -------------- | ----- | ------------------ | --------- |
+| EXCALIBUR G650 | any   | `false`            | Supported |
+| EXCALIBUR G670 | any   | `false`            | Supported |
+| EXCALIBUR G750 | any   | `false`            | Supported |
+| EXCALIBUR G900 | CP131 | `false`            | Supported |
+| EXCALIBUR G870 | CQ141 | `true`             | Supported |
+| EXCALIBUR G770 | CP191 | `true`             | Supported |
 
 If your model is not listed, the driver will still load and function but will emit a warning in `dmesg`. See [Adding New Models](#adding-new-models).
 
@@ -73,15 +75,17 @@ If nothing is returned, the firmware does not expose the WMI interface and the d
 ---
 
 ## Installation
+
 Then proceed with the standard install:
 
 ```bash
 sudo ./install.sh install
 ```
+
 ### Temporary (current session only, safe for testing)
 
 ```bash
-git clone https://github.com/TeknoAnka/excalibur-vmi-lupus.git
+git clone https://github.com/Antolun/excalibur-vmi.git
 cd excalibur-vmi-lupus
 make
 sudo insmod excalibur.ko
@@ -218,13 +222,13 @@ mode=0x1, alpha=0x2, R=0xFF, G=0x00, B=0x00
 
 ### Zone IDs
 
-| ID | Zone |
-|---|---|
-| `0x03` | Left keyboard zone |
-| `0x04` | Middle keyboard zone |
-| `0x05` | Right keyboard zone |
+| ID     | Zone                                                                 |
+| ------ | -------------------------------------------------------------------- |
+| `0x03` | Left keyboard zone                                                   |
+| `0x04` | Middle keyboard zone                                                 |
+| `0x05` | Right keyboard zone                                                  |
 | `0x06` | All keyboard zones broadcast (firmware-side, sets all three at once) |
-| `0x07` | Corner LEDs |
+| `0x07` | Corner LEDs                                                          |
 
 Zone `0x06` is used internally by the driver when a brightness change is issued on any keyboard zone, since the firmware propagates brightness to all three keyboard zones regardless of which one is written. The driver uses this to keep the cache consistent.
 
@@ -232,17 +236,17 @@ Zone `0x06` is used internally by the driver when a brightness change is issued 
 
 Confirmed by hardware brute-force on G870 (BIOS CQ141). The mode occupies bits [31:28] of the data word.
 
-| Nibble | Name | Behavior |
-|---|---|---|
-| `0x0` | `off` | LEDs off entirely |
-| `0x1` | `static` | Solid color, no animation |
-| `0x2` | `blink` | On/off flashing |
-| `0x3` | `fade` | Smooth breathing — fades out then back in |
-| `0x4` | `heartbeat` | Double-pulse pattern |
-| `0x5` | `wave` | Color sweeps left to right across zones (discrete steps, not smooth) |
-| `0x6` | `random` | Each zone assigned a random color every ~1 second |
-| `0x7` | `rainbow` | Smooth rainbow cycle across all zones |
-| `0x8–0xf` | — | Overflow; hardware falls back to rainbow |
+| Nibble    | Name        | Behavior                                                             |
+| --------- | ----------- | -------------------------------------------------------------------- |
+| `0x0`     | `off`       | LEDs off entirely                                                    |
+| `0x1`     | `static`    | Solid color, no animation                                            |
+| `0x2`     | `blink`     | On/off flashing                                                      |
+| `0x3`     | `fade`      | Smooth breathing — fades out then back in                            |
+| `0x4`     | `heartbeat` | Double-pulse pattern                                                 |
+| `0x5`     | `wave`      | Color sweeps left to right across zones (discrete steps, not smooth) |
+| `0x6`     | `random`    | Each zone assigned a random color every ~1 second                    |
+| `0x7`     | `rainbow`   | Smooth rainbow cycle across all zones                                |
+| `0x8–0xf` | —           | Overflow; hardware falls back to rainbow                             |
 
 > **Note:** Mode `0x7` (rainbow) was discovered by hardware brute-force on the G870 and is not documented in any upstream patch or public firmware reference. All prior documentation of this WMI protocol stopped at mode `0x6`.
 
@@ -250,12 +254,12 @@ Confirmed by hardware brute-force on G870 (BIOS CQ141). The mode occupies bits [
 
 Sent as `a2` in a `EXCALIBUR_POWERPLAN` write command:
 
-| Value | Plan |
-|---|---|
-| `1` | High |
-| `2` | Gaming |
-| `3` | Normal |
-| `4` | Low |
+| Value | Plan   |
+| ----- | ------ |
+| `1`   | High   |
+| `2`   | Gaming |
+| `3`   | Normal |
+| `4`   | Low    |
 
 ### Fan Speed Encoding
 
@@ -286,26 +290,26 @@ Four LED class devices are registered, one per zone:
 
 Each exposes the following attributes:
 
-| Attribute | Access | Description |
-|---|---|---|
-| `brightness` | RW | Brightness level: `0`, `1`, or `2` |
-| `max_brightness` | RO | Always `2` |
-| `color` | WO | 6-digit hex RGB: `RRGGBB` |
-| `mode` | RW | Animation mode name (see table above) |
-| `available_modes` | RO | Space-separated list of valid mode names |
-| `raw` | WO | Debug: send raw 32-bit hex data word directly to hardware |
+| Attribute         | Access | Description                                               |
+| ----------------- | ------ | --------------------------------------------------------- |
+| `brightness`      | RW     | Brightness level: `0`, `1`, or `2`                        |
+| `max_brightness`  | RO     | Always `2`                                                |
+| `color`           | WO     | 6-digit hex RGB: `RRGGBB`                                 |
+| `mode`            | RW     | Animation mode name (see table above)                     |
+| `available_modes` | RO     | Space-separated list of valid mode names                  |
+| `raw`             | WO     | Debug: send raw 32-bit hex data word directly to hardware |
 
 ### hwmon Device
 
 Registered as `excalibur_wmi` under `/sys/class/hwmon/hwmon*/`:
 
-| File | Access | Description |
-|---|---|---|
-| `fan1_input` | RO | CPU fan speed in RPM |
-| `fan1_label` | RO | `cpu_fan` |
-| `fan2_input` | RO | GPU fan speed in RPM |
-| `fan2_label` | RO | `gpu_fan` |
-| `pwm1` | RW | Power plan (1–4, see table above) |
+| File         | Access | Description                       |
+| ------------ | ------ | --------------------------------- |
+| `fan1_input` | RO     | CPU fan speed in RPM              |
+| `fan1_label` | RO     | `cpu_fan`                         |
+| `fan2_input` | RO     | GPU fan speed in RPM              |
+| `fan2_label` | RO     | `gpu_fan`                         |
+| `pwm1`       | RW     | Power plan (1–4, see table above) |
 
 ---
 
@@ -376,6 +380,7 @@ done
 ```
 
 Each `raw` write logs to `dmesg`:
+
 ```
 excalibur-wmi: raw: zone=0x03 data=0x72FFFFFF ret=0
 ```
@@ -420,6 +425,7 @@ echo 4 | sudo tee /sys/class/hwmon/hwmon*/pwm1   # Low Power
 Save these as executable scripts and call them as needed.
 
 **Gaming** — High Power, red static:
+
 ```bash
 #!/bin/bash
 echo 1 | tee /sys/class/hwmon/hwmon*/pwm1
@@ -431,6 +437,7 @@ echo 2 | tee /sys/class/leds/excalibur::kbd_backlight-left/brightness
 ```
 
 **Battery** — Low Power, dim blue fade:
+
 ```bash
 #!/bin/bash
 echo 4 | tee /sys/class/hwmon/hwmon*/pwm1
@@ -442,6 +449,7 @@ echo 1 | tee /sys/class/leds/excalibur::kbd_backlight-left/brightness
 ```
 
 **Rainbow** — Gaming, full rainbow:
+
 ```bash
 #!/bin/bash
 echo 2 | tee /sys/class/hwmon/hwmon*/pwm1
@@ -452,6 +460,7 @@ echo 2 | tee /sys/class/leds/excalibur::kbd_backlight-left/brightness
 ```
 
 **RGB Split** — three-zone red/green/blue:
+
 ```bash
 #!/bin/bash
 echo FF0000 | tee /sys/class/leds/excalibur::kbd_backlight-left/color
@@ -464,6 +473,7 @@ echo 2 | tee /sys/class/leds/excalibur::kbd_backlight-left/brightness
 ```
 
 **Off** — LEDs off, Low Power:
+
 ```bash
 #!/bin/bash
 echo 4 | tee /sys/class/hwmon/hwmon*/pwm1
@@ -562,13 +572,13 @@ sudo python3 control-panel.py
 
 **Keyboard Shortcuts:**
 
-| Key | Action |
-|---|---|
-| `1` | Switch to Dashboard tab |
-| `2` | Switch to Lighting tab |
-| `3` | Switch to Power tab |
+| Key | Action                                     |
+| --- | ------------------------------------------ |
+| `1` | Switch to Dashboard tab                    |
+| `2` | Switch to Lighting tab                     |
+| `3` | Switch to Power tab                        |
 | `r` | Refresh fan readings and power plan status |
-| `q` | Quit the application |
+| `q` | Quit the application                       |
 
 **Sysfs Integration:**
 
@@ -640,6 +650,7 @@ Your kernel uses the older `wmi_set_block` name. Replace `wmidev_block_set(drv->
 ## Adding New Models
 
 1. Get your DMI information:
+
 ```bash
 sudo dmidecode -s system-product-name
 sudo dmidecode -s system-version
@@ -647,6 +658,7 @@ sudo dmidecode -s bios-version
 ```
 
 2. Add an entry to `excalibur_dmi_list[]` in `excalibur.c`:
+
 ```c
 {
     .callback    = dmi_matched,
@@ -663,6 +675,7 @@ sudo dmidecode -s bios-version
 Set `driver_data` to `(void *)false` if your model has an Intel 10th gen CPU or older (needs byte-swap). Set to `(void *)true` for 11th gen and newer.
 
 3. If your model's mode nibble values differ from the table above, use the `raw` attribute to brute-force them:
+
 ```bash
 for mode in 0 1 2 3 4 5 6 7 8 9 a b c d e f; do
     echo ${mode}2FF0000 | sudo tee /sys/class/leds/excalibur::kbd_backlight-left/raw > /dev/null

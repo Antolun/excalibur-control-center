@@ -1,7 +1,7 @@
 #!/bin/bash
 # ============================================================================
 #                     WMI Driver + Control Panel Installer
-#                       github.com/TeknoAnka/excalibur-vmi-lupus
+#                       github.com/Antolun/excalibur-vmi
 # ============================================================================
 # Usage:
 #   sudo ./install.sh                  — interactive wizard
@@ -49,7 +49,7 @@ MAKE_FLAGS=""     # extra flags forwarded to every make invocation
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 print_banner() {
-    echo -e "  ${W}WMI Driver + Control Panel Installer${NC}   ${D}github.com/TeknoAnka/excalibur-vmi-lupus${NC}"
+    echo -e "  ${W}WMI Driver + Control Panel Installer${NC}   ${D}github.com/Antolun/excalibur-vmi${NC}"
     echo -e "  ${D}────────────────────────────────────────────────────────────────────${NC}"
     echo ""
 }
