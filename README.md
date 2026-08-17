@@ -55,7 +55,7 @@ The `has_raw_fanspeed` flag controls whether the fan speed register value is use
 
 ```bash
 # LupuS
-sudo pisi it base-devel linux-headers
+sudo luppo it base-devel linux-headers
 ```
 
 ```bash

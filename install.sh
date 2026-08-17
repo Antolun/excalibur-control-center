@@ -99,9 +99,14 @@ detect_distro() {
             PKG_INSTALL="pacman -S --noconfirm"
             HEADERS_PKG="linux-headers"
             ;;
-        pisi|lupus)
+        pisi)
             INITRAMFS_CMD="mkinitramfs"
             PKG_INSTALL="pisi -S --yes-all"
+            HEADERS_PKG="linux-headers"
+            ;;
+        lupus)
+            INITRAMFS_CMD="mkinitramfs"
+            PKG_INSTALL="luppo -S --yes-all"
             HEADERS_PKG="linux-headers"
             ;;
         ubuntu|debian|linuxmint|pop)
