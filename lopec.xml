@@ -1,0 +1,48 @@
+<LUPPO>
+    <Source>
+        <Name>excalibur-control-center</Name>
+        <Homepage>https://github.com/Antolun/excalibur-vmi</Homepage>
+        <Packager>
+            <Name>Solzic0</Name>
+            <Email>solzic0@yandex.com</Email>
+        </Packager>
+        <License>GPL-2.0-or-later</License>
+        <IsA>driver</IsA>
+        <Summary>Casper Excalibur WMI Kernel Driver and Control Panel</Summary>
+        <Description>Linux WMI kernel driver and Python/PyQt6 Control Panel for Casper Excalibur gaming laptops providing ACPI/WMI power profiles, RGB keyboard lighting control, hwmon fan monitoring, and automatic DKMS integration.</Description>
+    </Source>
+
+    <Package>
+        <Name>excalibur-control-center</Name>
+        <Summary>Casper Excalibur WMI Kernel Driver and Control Panel</Summary>
+        <Description>Linux WMI kernel driver and Python/PyQt6 Control Panel for Casper Excalibur gaming laptops providing ACPI/WMI power profiles, RGB keyboard lighting control, hwmon fan monitoring, and automatic DKMS integration.</Description>
+        <RuntimeDependencies>
+            <Dependency>dkms</Dependency>
+            <Dependency>python3</Dependency>
+        </RuntimeDependencies>
+        <Files>
+            <Path fileType="executable">/usr/bin/excalibur-panel</Path>
+            <Path fileType="data">/opt/excalibur-panel</Path>
+            <Path fileType="data">/usr/src/excalibur-control-center-1.0.0</Path>
+            <Path fileType="config">/etc/udev/rules.d/99-excalibur.rules</Path>
+            <Path fileType="config">/etc/modules-load.d/excalibur.conf</Path>
+            <Path fileType="data">/usr/share/applications/excalibur-control-center.desktop</Path>
+            <Path fileType="data">/usr/share/icons/hicolor/128x128/apps/excalibur-control-center.png</Path>
+            <Path fileType="data">/lib/modules</Path>
+            <Path fileType="doc">/usr/share/doc/excalibur-control-center</Path>
+        </Files>
+        <Provides>
+            <COMAR script="package.py">System.Package</COMAR>
+        </Provides>
+    </Package>
+
+    <History>
+        <Update release="1">
+            <Date>2026-08-22</Date>
+            <Version>1.0.0</Version>
+            <Comment>Initial Luppo package release with DKMS, COMAR, Kernel Driver, and Control Panel.</Comment>
+            <Name>Solzic0</Name>
+            <Email>solzic0@yandex.com</Email>
+        </Update>
+    </History>
+</LUPPO>

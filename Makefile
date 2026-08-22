@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
-# Makefile for the excalibur-wmi out-of-tree kernel module.
+# Makefile for the excalibur-control-center out-of-tree kernel module.
 
 # In-tree Kconfig hook — used when built as part of the kernel tree.
-ifneq ($(CONFIG_EXCALIBUR_WMI),)
-obj-$(CONFIG_EXCALIBUR_WMI) += excalibur.o
+ifneq ($(CONFIG_EXCALIBUR_CONTROL_CENTER),)
+obj-$(CONFIG_EXCALIBUR_CONTROL_CENTER) += excalibur.o
 else
 # Out-of-tree build — CONFIG_ is not set, so force obj-m.
 obj-m += excalibur.o
@@ -21,4 +21,7 @@ install:
 clean:
 	$(MAKE) -C $(KDIR) M=$(PWD) clean
 
-.PHONY: all install clean
+package-luppo:
+	bash ./build-luppo.sh
+
+.PHONY: all install clean package-luppo

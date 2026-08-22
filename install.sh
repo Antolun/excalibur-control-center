@@ -9,6 +9,7 @@
 #   sudo ./install.sh uninstall        — non-interactive manual uninstall
 #   sudo ./install.sh dkms-install     — register + build via DKMS
 #   sudo ./install.sh dkms-uninstall   — remove DKMS registration
+#   sudo ./install.sh package-luppo    — build Luppo package (.luppo)
 # ============================================================================
 #set -euo pipefail
 
@@ -25,7 +26,7 @@ NC='\033[0m'
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 MODULE_NAME="excalibur"
-DKMS_NAME="excalibur-wmi"
+DKMS_NAME="excalibur-control-center"
 DKMS_VERSION="1.0.0"
 KO_FILE="${MODULE_NAME}.ko"
 LIB_MODULES="/lib/modules/$(uname -r)"
@@ -106,7 +107,7 @@ detect_distro() {
             ;;
         lupus)
             INITRAMFS_CMD="mkinitramfs"
-            PKG_INSTALL="luppo -S --yes-all"
+            PKG_INSTALL="luppo emerge -y"
             HEADERS_PKG="linux-headers"
             ;;
         ubuntu|debian|linuxmint|pop)
@@ -570,7 +571,7 @@ uninstall_dkms_driver() {
 install_udev_rules() {
     step "Installing udev rules"
     cat > "${UDEV_RULES_FILE}" <<'UDEV'
-# excalibur-wmi udev rules
+# excalibur-control-center udev rules
 # Grants write access to LED zones and power plan for wheel/sudo group members,
 # allowing the control panel to run without sudo.
 
@@ -580,7 +581,7 @@ SUBSYSTEM=="leds", KERNEL=="excalibur*", \
     RUN+="/bin/sh -c 'chown root:sudo  /sys%p/brightness /sys%p/color /sys%p/mode /sys%p/raw 2>/dev/null; chmod g+w /sys%p/brightness /sys%p/color /sys%p/mode /sys%p/raw 2>/dev/null'"
 
 # hwmon (fan speeds + power plan)
-SUBSYSTEM=="hwmon", ATTR{name}=="excalibur_wmi", \
+SUBSYSTEM=="hwmon", ATTR{name}=="excalibur_control_center", \
     RUN+="/bin/sh -c 'chown root:wheel /sys%p/pwm1 /sys%p/fan1_input /sys%p/fan2_input 2>/dev/null; chmod g+rw /sys%p/pwm1 2>/dev/null'", \
     RUN+="/bin/sh -c 'chown root:sudo  /sys%p/pwm1 /sys%p/fan1_input /sys%p/fan2_input 2>/dev/null; chmod g+rw /sys%p/pwm1 2>/dev/null'"
 UDEV
@@ -688,7 +689,7 @@ verify_install() {
 
     local hwmon_found=false
     for f in /sys/class/hwmon/hwmon*/name; do
-        [[ "$(cat "$f" 2>/dev/null)" == "excalibur_wmi" ]] && hwmon_found=true && break
+        [[ "$(cat "$f" 2>/dev/null)" == "excalibur_control_center" ]] && hwmon_found=true && break
     done
     $hwmon_found && ok "hwmon device found" || warn "hwmon device not found yet"
 
@@ -738,7 +739,7 @@ interactive_install() {
         warn "excalibur module is already loaded."
         ask "Reinstall / upgrade the kernel driver?" && INSTALL_DRIVER=true || INSTALL_DRIVER=false
     else
-        ask "Install the excalibur-wmi kernel driver?" && INSTALL_DRIVER=true || INSTALL_DRIVER=false
+        ask "Install the excalibur-control-center kernel driver?" && INSTALL_DRIVER=true || INSTALL_DRIVER=false
         [[ "$INSTALL_DRIVER" == false ]] && warn "Skipping driver — hardware controls will not work."
     fi
 
@@ -858,6 +859,20 @@ interactive_uninstall() {
     echo -e "\n  ${G}✔${NC}  Uninstall complete.\n"
 }
 
+build_luppo_package() {
+    step "Building Luppo package (.luppo)"
+    if ! command -v luppo &>/dev/null; then
+        err "luppo package manager is not installed on this system."
+        return 1
+    fi
+
+    if [[ -f "./build-luppo.sh" ]]; then
+        bash ./build-luppo.sh
+    else
+        luppo build lopec.xml --no-sandbox --ignore-dependency
+    fi
+}
+
 # ── Entry point ───────────────────────────────────────────────────────────────
 require_root
 detect_distro
@@ -906,11 +921,15 @@ case "${1:-}" in
         uninstall_udev_rules
         ok "DKMS uninstall complete."
         ;;
+    package-luppo|luppo-package|build-luppo)
+        print_banner
+        build_luppo_package
+        ;;
     "")
         interactive_install
         ;;
     *)
-        echo -e "Usage: sudo $0 [install|uninstall|dkms-install|dkms-uninstall]"
+        echo -e "Usage: sudo $0 [install|uninstall|dkms-install|dkms-uninstall|package-luppo]"
         exit 1
         ;;
 esac

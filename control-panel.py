@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-control-panel.py — PyQt6 GUI control center for the excalibur-wmi kernel driver.
+control-panel.py — PyQt6 GUI control center for the excalibur-control-center kernel driver.
 
 Requires:
     pip install PyQt6
@@ -56,7 +56,7 @@ TRANSLATIONS = {
         "Excalibur Control Center": "Excalibur Kontrol Merkezi",
         "CONTROL CENTER": "KONTROL MERKEZİ",
         "Ready": "Hazır",
-        "Warning: excalibur-wmi driver not found.": "Uyarı: excalibur-wmi sürücüsü bulunamadı.",
+        "Warning: excalibur-control-center driver not found.": "Uyarı: excalibur-control-center sürücüsü bulunamadı.",
         "Another instance is already running. Exiting.": "Başka bir örnek zaten çalışıyor. Çıkılıyor.",
 
         # Dashboard Tab
@@ -222,15 +222,15 @@ TRANSLATIONS = {
         "Click the button below to run system diagnostics...": "Sistem tanılarını çalıştırmak için aşağıdaki düğmeye tıklayın...",
         "Running diagnostics...": "Tanı çalıştırılıyor...",
         "Excalibur ACPI/WMI driver interface is fully loaded and active.": "Excalibur ACPI/WMI sürücü arayüzü tamamen yüklü ve aktif.",
-        "The excalibur-wmi driver could not be detected. Please ensure it is installed.": "excalibur-wmi sürücüsü tespit edilemedi. Lütfen yüklü olduğundan emin olun.",
+        "The excalibur-control-center driver could not be detected. Please ensure it is installed.": "excalibur-control-center sürücüsü tespit edilemedi. Lütfen yüklü olduğundan emin olun.",
         "DRIVER ACTIVE ✓": "SÜRÜCÜ AKTİF ✓",
         "DRIVER INACTIVE ×": "SÜRÜCÜ PASİF ×",
         "Application Name:": "Uygulama Adı:",
-        "Excalibur-WMI Control Center": "Excalibur-WMI Kontrol Merkezi",
+        "Excalibur Control Center": "Excalibur Kontrol Merkezi",
         "hwmon path:": "hwmon yolu:",
         "LED Base path:": "LED Taban yolu:",
         "Available Modes:": "Kullanılabilir Modlar:",
-        "<b>Excalibur-WMI Control Center</b> is an open-source system utility for Excalibur laptops.<br>Designed to control fan performance curves and RGB lighting zones under Linux.<br><br><span style='color: #8b949e;'>Source Code: github.com/Antolun/excalibur-wmi-lupus<br>License: GPL-2.0-or-later</span>": "<b>Excalibur-WMI Kontrol Merkezi</b>, Excalibur dizüstü bilgisayarlar için açık kaynaklı bir sistem aracıdır.<br>Linux altında fan performans eğrilerini ve RGB aydınlatma bölgelerini kontrol etmek için tasarlanmıştır.<br><br><span style='color: #8b949e;'>Kaynak Kod: github.com/Antolun/excalibur-wmi-lupus<br>Lisans: GPL-2.0-or-later</span>",
+        "<b>Excalibur Control Center</b> is an open-source system utility for Excalibur laptops.<br>Designed to control fan performance curves and RGB lighting zones under Linux.<br><br><span style='color: #8b949e;'>Source Code: github.com/Antolun/excalibur-control-center<br>License: GPL-2.0-or-later</span>": "<b>Excalibur Kontrol Merkezi</b>, Excalibur dizüstü bilgisayarlar için açık kaynaklı bir sistem aracıdır.<br>Linux altında fan performans eğrilerini ve RGB aydınlatma bölgelerini kontrol etmek için tasarlanmıştır.<br><br><span style='color: #8b949e;'>Kaynak Kod: github.com/Antolun/excalibur-control-center-lupus<br>Lisans: GPL-2.0-or-later</span>",
 
         # System Tray Messages & Messages
         "Show": "Göster",
@@ -633,7 +633,7 @@ def _write(path: str, value: str) -> tuple[bool, str]:
 def find_hwmon_path() -> str | None:
     for name_path in glob.glob(f"{HWMON_BASE}/hwmon*/name"):
         val = _read(name_path)
-        if val == "excalibur_wmi":
+        if val == "excalibur_control_center":
             return str(Path(name_path).parent)
     return None
 
@@ -699,7 +699,7 @@ def get_colored_tray_icon(color_hex: str) -> QIcon:
     
     return QIcon(pixmap)
 
-UDEV_RULES_CONTENT = r"""# excalibur-wmi udev rules
+UDEV_RULES_CONTENT = r"""# excalibur-control-center udev rules
 # Grants write access to LED zones and power plan for wheel/sudo group members,
 # allowing the control panel to run without sudo.
 
@@ -709,7 +709,7 @@ SUBSYSTEM=="leds", KERNEL=="excalibur*", \
     RUN+="/bin/sh -c 'chown root:sudo  /sys%p/brightness /sys%p/color /sys%p/mode /sys%p/raw 2>/dev/null; chmod g+w /sys%p/brightness /sys%p/color /sys%p/mode /sys%p/raw 2>/dev/null'"
 
 # hwmon (fan speeds + power plan)
-SUBSYSTEM=="hwmon", ATTR{name}=="excalibur_wmi", \
+SUBSYSTEM=="hwmon", ATTR{name}=="excalibur_control_center", \
     RUN+="/bin/sh -c 'chown root:wheel /sys%p/pwm1 /sys%p/fan1_input /sys%p/fan2_input 2>/dev/null; chmod g+rw /sys%p/pwm1 2>/dev/null'", \
     RUN+="/bin/sh -c 'chown root:sudo  /sys%p/pwm1 /sys%p/fan1_input /sys%p/fan2_input 2>/dev/null; chmod g+rw /sys%p/pwm1 2>/dev/null'"
 """
@@ -2599,7 +2599,7 @@ class ExcaliburControlPanel(QMainWindow):
         dsb_status = QLabel(status_text)
         dsb_status.setStyleSheet(f"font-size: 13px; font-weight: bold; color: {status_color}; letter-spacing: 1px;")
 
-        dsb_desc = QLabel(tr("Excalibur ACPI/WMI driver interface is fully loaded and active.") if self.hwmon_path else tr("The excalibur-wmi driver could not be detected. Please ensure it is installed."))
+        dsb_desc = QLabel(tr("Excalibur ACPI/WMI driver interface is fully loaded and active.") if self.hwmon_path else tr("The excalibur-control-center driver could not be detected. Please ensure it is installed."))
         dsb_desc.setStyleSheet("font-size: 11px; color: #8b949e;")
         
         dsb_text_layout.addWidget(dsb_status)
@@ -2628,7 +2628,7 @@ class ExcaliburControlPanel(QMainWindow):
             grid.addWidget(lbl_name, row, 0)
             grid.addWidget(lbl_val, row, 1)
             
-        add_row(0, tr("Application Name:"), tr("Excalibur-WMI Control Center"))
+        add_row(0, tr("Application Name:"), tr("Excalibur Control Center"))
         add_row(1, tr("hwmon path:"), hwmon, is_code=True)
         add_row(2, tr("LED Base path:"), f"{LED_BASE}/excalibur::kbd_backlight-*", is_code=True)
         add_row(3, tr("Available Modes:"), ", ".join(self.modes), is_code=True)
@@ -2660,9 +2660,9 @@ class ExcaliburControlPanel(QMainWindow):
         panel_layout.addWidget(separator)
         
         footer = QLabel(
-            "<b>Excalibur-WMI Control Center</b> is an open-source system utility for Excalibur laptops.<br>"
+            "<b>Excalibur Control Center</b> is an open-source system utility for Excalibur laptops.<br>"
             "Designed to control fan performance curves and RGB lighting zones under Linux.<br><br>"
-            "<span style='color: #8b949e;'>Source Code: github.com/Antolun/excalibur-wmi-lupus<br>"
+            "<span style='color: #8b949e;'>Source Code: github.com/Antolun/excalibur-control-center<br>"
             "License: GPL-2.0-or-later</span>"
         )
         footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -3118,7 +3118,7 @@ class ExcaliburControlPanel(QMainWindow):
         else:
             log.append(f"WMI GUID: NOT found ({wmi_guid})")
             log.append("  → This means the firmware does not expose this ACPI/WMI interface.")
-            log.append("  → The excalibur-wmi module is loaded but cannot bind to your hardware.")
+            log.append("  → The excalibur-control-center module is loaded but cannot bind to your hardware.")
             log.append("  → Keyboard LED control still works via the sysfs LED class driver.")
             
         led_paths = glob.glob(f"{LED_BASE}/excalibur::kbd_backlight-*")
@@ -4309,7 +4309,7 @@ if __name__ == "__main__":
     # Check driver
     led_glob = glob.glob(f"{LED_BASE}/excalibur::kbd_backlight-*")
     if not led_glob and not find_hwmon_path():
-        print("Warning: excalibur-wmi driver not found.")
+        print("Warning: excalibur-control-center driver not found.")
         
     window = ExcaliburControlPanel()
     helper.start_server(window)

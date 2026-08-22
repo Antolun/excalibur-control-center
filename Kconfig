@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
-# Kconfig for drivers/platform/x86/excalibur-wmi.c
+# Kconfig for drivers/platform/x86/excalibur-control-center.c
 # (also used for out-of-tree builds — sourced by the out-of-tree Makefile)
 
-config EXCALIBUR_WMI
+config EXCALIBUR_CONTROL_CENTER
 	tristate "Excalibur gaming laptop WMI driver"
 	depends on ACPI_WMI
 	depends on LEDS_CLASS

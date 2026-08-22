@@ -93,7 +93,7 @@ sudo insmod excalibur.ko
 
 The module will be unloaded on reboot. Nothing is written to `/lib/modules/`.
 
-### Permanent
+### Permanent (Manual)
 
 ```bash
 sudo ./install.sh install
@@ -101,10 +101,41 @@ sudo ./install.sh install
 
 This builds the module, copies it to `/lib/modules/$(uname -r)/extra/`, runs `depmod -a`, writes `/etc/modules-load.d/excalibur.conf` for auto-loading, and updates initramfs.
 
+### Permanent (DKMS)
+
+DKMS automatically rebuilds and installs the driver upon every kernel upgrade:
+
+```bash
+sudo ./install.sh dkms-install
+```
+
+### Luppo Package (.luppo) for LupuS OS
+
+To create a `.luppo` binary package with automatic DKMS registration and COMAR configuration:
+
+```bash
+# Using build script
+sudo ./build-luppo.sh
+
+# Or using install.sh
+sudo ./install.sh package-luppo
+
+# Or via Makefile
+make package-luppo
+```
+
+Install the created `.luppo` package on LupuS:
+
+```bash
+sudo luppo install excalibur-control-center-1.0.0-1-x86_64.luppo
+```
+
 ### Uninstall
 
 ```bash
 sudo ./install.sh uninstall
+# or for DKMS:
+sudo ./install.sh dkms-uninstall
 ```
 
 Or manually:
@@ -122,10 +153,10 @@ sudo depmod -a
 
 ### State Container
 
-All mutable driver state lives in `struct excalibur_wmi_data`, allocated with `devm_kzalloc` during probe and attached to the WMI device via `dev_set_drvdata`. This eliminates global variables and makes the driver safe for concurrent sysfs access.
+All mutable driver state lives in `struct excalibur_control_center_data`, allocated with `devm_kzalloc` during probe and attached to the WMI device via `dev_set_drvdata`. This eliminates global variables and makes the driver safe for concurrent sysfs access.
 
 ```c
-struct excalibur_wmi_data {
+struct excalibur_control_center_data {
     struct wmi_device    *wdev;
     bool                  has_raw_fanspeed;
     struct mutex          lock;             /* protects zones[] + HW access */
@@ -166,10 +197,10 @@ user writes sysfs attr
 
 ### WMI Transport
 
-`excalibur_set()` writes a command to the WMI block. `excalibur_query()` writes a read command then calls `wmidev_block_query()` to retrieve the result. Both operate on `struct excalibur_wmi_args`:
+`excalibur_set()` writes a command to the WMI block. `excalibur_query()` writes a read command then calls `wmidev_block_query()` to retrieve the result. Both operate on `struct excalibur_control_center_args`:
 
 ```c
-struct excalibur_wmi_args {
+struct excalibur_control_center_args {
     u16 a0;   /* direction: 0xfa00 READ, 0xfb00 WRITE */
     u16 a1;   /* command:   0x0100 SET_LED, 0x0200 GET_HARDWAREINFO, 0x0300 POWERPLAN */
     u32 a2;   /* zone_id (for LED) or plan value (for POWERPLAN) */
@@ -301,7 +332,7 @@ Each exposes the following attributes:
 
 ### hwmon Device
 
-Registered as `excalibur_wmi` under `/sys/class/hwmon/hwmon*/`:
+Registered as `excalibur_control_center` under `/sys/class/hwmon/hwmon*/`:
 
 | File         | Access | Description                       |
 | ------------ | ------ | --------------------------------- |
@@ -382,7 +413,7 @@ done
 Each `raw` write logs to `dmesg`:
 
 ```
-excalibur-wmi: raw: zone=0x03 data=0x72FFFFFF ret=0
+excalibur-control-center: raw: zone=0x03 data=0x72FFFFFF ret=0
 ```
 
 ---
@@ -643,7 +674,7 @@ Your model is not in the DMI table. The driver functions normally but `has_raw_f
 Your kernel is older than 6.4. Replace with `mutex_init(&drv->lock)` and add a `remove` callback that calls `mutex_destroy(&drv->lock)`.
 
 **Build fails on `wmidev_block_set`:**
-Your kernel uses the older `wmi_set_block` name. Replace `wmidev_block_set(drv->wdev, 0, &input)` with `wmi_set_block(EXCALIBUR_WMI_GUID, 0, &input)`.
+Your kernel uses the older `wmi_set_block` name. Replace `wmidev_block_set(drv->wdev, 0, &input)` with `wmi_set_block(EXCALIBUR_CONTROL_CENTER_GUID, 0, &input)`.
 
 ---
 

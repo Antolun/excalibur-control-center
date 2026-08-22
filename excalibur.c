@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 /*
- * excalibur-wmi.c — WMI driver for Excalibur gaming laptops
+ * excalibur-control-center.c — WMI driver for Excalibur gaming laptops
  *
  * Provides per-zone RGB keyboard control, fan speed monitoring, and power
  * plan management via the ACPI/WMI interface.
@@ -28,7 +28,7 @@ MODULE_AUTHOR("Solzic0");
 MODULE_DESCRIPTION("Excalibur VMI Driver");
 MODULE_LICENSE("GPL v2");
 
-#define EXCALIBUR_WMI_GUID		"644C5791-B7B0-4123-A90B-E93876E0DAAD"
+#define EXCALIBUR_CONTROL_CENTER_GUID		"644C5791-B7B0-4123-A90B-E93876E0DAAD"
 
 /* WMI command codes */
 #define EXCALIBUR_READ			0xfa00
@@ -131,14 +131,14 @@ static const char * const excalibur_mode_names[] = {
  * ================================================================ */
 
 /*
- * struct excalibur_wmi_args - WMI block I/O layout
+ * struct excalibur_control_center_args - WMI block I/O layout
  *
  * u16 a0, a1 sit at bytes 0–3 (no padding: 2+2 = 4, naturally aligned
  * for the following u32 a2 at offset 4).  __packed is not needed, but
- * the struct size must stay exactly sizeof(struct excalibur_wmi_args)
+ * the struct size must stay exactly sizeof(struct excalibur_control_center_args)
  * to satisfy wmidev_block_set()'s acpi_buffer length check.
  */
-struct excalibur_wmi_args {
+struct excalibur_control_center_args {
 	u16 a0, a1;
 	u32 a2, a3, a4, a5, a6, rev0, rev1;
 };
@@ -153,7 +153,7 @@ struct excalibur_wmi_args {
  * @b:       cached blue component (0–255)
  *
  * The cdev.brightness field (0–2) caches the current brightness.
- * All fields are protected by excalibur_wmi_data.lock.
+ * All fields are protected by excalibur_control_center_data.lock.
  */
 struct excalibur_zone {
 	struct led_classdev	cdev;
@@ -163,13 +163,13 @@ struct excalibur_zone {
 };
 
 /**
- * struct excalibur_wmi_data - driver state container
+ * struct excalibur_control_center_data - driver state container
  * @wdev:             WMI device handle
  * @has_raw_fanspeed: false on older models that need byte-swap
  * @lock:             mutex protecting all zone state + HW access
  * @zones:            0=left 1=middle 2=right 3=corners
  */
-struct excalibur_wmi_data {
+struct excalibur_control_center_data {
 	struct wmi_device	*wdev;
 	bool			 has_raw_fanspeed;
 	struct mutex		 lock;
@@ -288,10 +288,10 @@ static const struct dmi_system_id excalibur_dmi_list[] = {
  * WMI low-level helpers
  * ================================================================ */
 
-static int excalibur_set(struct excalibur_wmi_data *drv, u16 cmd,
+static int excalibur_set(struct excalibur_control_center_data *drv, u16 cmd,
 			 u8 zone_id, u32 data)
 {
-	struct excalibur_wmi_args args = {
+	struct excalibur_control_center_args args = {
 		.a0 = EXCALIBUR_WRITE,
 		.a1 = cmd,
 		.a2 = zone_id,
@@ -304,10 +304,10 @@ static int excalibur_set(struct excalibur_wmi_data *drv, u16 cmd,
 	return 0;
 }
 
-static int excalibur_query(struct excalibur_wmi_data *drv, u16 cmd,
-			   struct excalibur_wmi_args *out)
+static int excalibur_query(struct excalibur_control_center_data *drv, u16 cmd,
+			   struct excalibur_control_center_args *out)
 {
-	struct excalibur_wmi_args args = {
+	struct excalibur_control_center_args args = {
 		.a0 = EXCALIBUR_READ,
 		.a1 = cmd,
 	};
@@ -341,7 +341,7 @@ static int excalibur_query(struct excalibur_wmi_data *drv, u16 cmd,
  * Must be called with drv->lock held.
  * ================================================================ */
 
-static int excalibur_commit_zone(struct excalibur_wmi_data *drv,
+static int excalibur_commit_zone(struct excalibur_control_center_data *drv,
 				 struct excalibur_zone *zone)
 {
 	u32 data = FIELD_PREP(EXCALIBUR_LED_MODE,  zone->mode)           |
@@ -357,7 +357,7 @@ static int excalibur_commit_zone(struct excalibur_wmi_data *drv,
  * LED class device helpers
  * ================================================================ */
 
-static struct excalibur_wmi_data *lcdev_to_drv(struct led_classdev *cdev)
+static struct excalibur_control_center_data *lcdev_to_drv(struct led_classdev *cdev)
 {
 	/* The LED core sets dev->parent to the device we registered under. */
 	return dev_get_drvdata(cdev->dev->parent);
@@ -381,7 +381,7 @@ static struct excalibur_zone *lcdev_to_zone(struct led_classdev *cdev)
 static void excalibur_kbd_brightness_set(struct led_classdev *cdev,
 					 enum led_brightness brightness)
 {
-	struct excalibur_wmi_data *drv = lcdev_to_drv(cdev);
+	struct excalibur_control_center_data *drv = lcdev_to_drv(cdev);
 	struct excalibur_zone *zone = lcdev_to_zone(cdev);
 	u32 data;
 	int i;
@@ -416,7 +416,7 @@ static enum led_brightness excalibur_kbd_brightness_get(struct led_classdev *cde
 static void excalibur_corner_brightness_set(struct led_classdev *cdev,
 					    enum led_brightness brightness)
 {
-	struct excalibur_wmi_data *drv = lcdev_to_drv(cdev);
+	struct excalibur_control_center_data *drv = lcdev_to_drv(cdev);
 	struct excalibur_zone *zone = lcdev_to_zone(cdev);
 
 	mutex_lock(&drv->lock);
@@ -453,7 +453,7 @@ static ssize_t color_store(struct device *dev, struct device_attribute *attr,
 			   const char *buf, size_t count)
 {
 	struct led_classdev *cdev = dev_get_drvdata(dev);
-	struct excalibur_wmi_data *drv = lcdev_to_drv(cdev);
+	struct excalibur_control_center_data *drv = lcdev_to_drv(cdev);
 	struct excalibur_zone *zone = lcdev_to_zone(cdev);
 	unsigned int rgb;
 	int ret;
@@ -492,7 +492,7 @@ static ssize_t mode_store(struct device *dev, struct device_attribute *attr,
 			  const char *buf, size_t count)
 {
 	struct led_classdev *cdev = dev_get_drvdata(dev);
-	struct excalibur_wmi_data *drv = lcdev_to_drv(cdev);
+	struct excalibur_control_center_data *drv = lcdev_to_drv(cdev);
 	struct excalibur_zone *zone = lcdev_to_zone(cdev);
 	char name[16];
 	int i, ret;
@@ -550,7 +550,7 @@ static ssize_t raw_store(struct device *dev, struct device_attribute *attr,
 			 const char *buf, size_t count)
 {
 	struct led_classdev *cdev = dev_get_drvdata(dev);
-	struct excalibur_wmi_data *drv = lcdev_to_drv(cdev);
+	struct excalibur_control_center_data *drv = lcdev_to_drv(cdev);
 	struct excalibur_zone *zone = lcdev_to_zone(cdev);
 	u32 data;
 	int ret;
@@ -585,7 +585,7 @@ ATTRIBUTE_GROUPS(excalibur_zone);
  * hwmon — fan speed monitoring + power plan control
  * ================================================================ */
 
-static u16 excalibur_decode_fanspeed(struct excalibur_wmi_data *drv, u32 raw)
+static u16 excalibur_decode_fanspeed(struct excalibur_control_center_data *drv, u32 raw)
 {
 	u16 val = (u16)raw;
 
@@ -612,8 +612,8 @@ static umode_t excalibur_hwmon_is_visible(const void *drvdata,
 static int excalibur_hwmon_read(struct device *dev, enum hwmon_sensor_types type,
 				u32 attr, int channel, long *val)
 {
-	struct excalibur_wmi_data *drv = dev_get_drvdata(dev->parent);
-	struct excalibur_wmi_args out = { 0 };
+	struct excalibur_control_center_data *drv = dev_get_drvdata(dev->parent);
+	struct excalibur_control_center_args out = { 0 };
 	int ret;
 
 	switch (type) {
@@ -657,7 +657,7 @@ static int excalibur_hwmon_read_string(struct device *dev,
 static int excalibur_hwmon_write(struct device *dev, enum hwmon_sensor_types type,
 				 u32 attr, int channel, long val)
 {
-	struct excalibur_wmi_data *drv = dev_get_drvdata(dev->parent);
+	struct excalibur_control_center_data *drv = dev_get_drvdata(dev->parent);
 
 	if (type != hwmon_pwm || channel != 0)
 		return -EOPNOTSUPP;
@@ -692,10 +692,10 @@ static const struct hwmon_chip_info excalibur_hwmon_chip_info = {
  * Driver probe
  * ================================================================ */
 
-static int excalibur_wmi_probe(struct wmi_device *wdev, const void *context)
+static int excalibur_control_center_probe(struct wmi_device *wdev, const void *context)
 {
 	const struct excalibur_quirk *quirk = context;
-	struct excalibur_wmi_data *drv;
+	struct excalibur_control_center_data *drv;
 	struct device *hwmon_dev;
 	bool model_known;
 	int i, ret;
@@ -766,23 +766,23 @@ static int excalibur_wmi_probe(struct wmi_device *wdev, const void *context)
 	}
 
 	hwmon_dev = devm_hwmon_device_register_with_info(&wdev->dev,
-							 "excalibur_wmi", drv,
+							 "excalibur_control_center", drv,
 							 &excalibur_hwmon_chip_info,
 							 NULL);
 	return PTR_ERR_OR_ZERO(hwmon_dev);
 }
 
-static const struct wmi_device_id excalibur_wmi_id_table[] = {
-	{ .guid_string = EXCALIBUR_WMI_GUID },
+static const struct wmi_device_id excalibur_control_center_id_table[] = {
+	{ .guid_string = EXCALIBUR_CONTROL_CENTER_GUID },
 	{ }
 };
-MODULE_DEVICE_TABLE(wmi, excalibur_wmi_id_table);
+MODULE_DEVICE_TABLE(wmi, excalibur_control_center_id_table);
 
-static struct wmi_driver excalibur_wmi_driver = {
-	.driver       = { .name = "excalibur-wmi" },
-	.id_table     = excalibur_wmi_id_table,
-	.probe        = excalibur_wmi_probe,
+static struct wmi_driver excalibur_control_center_driver = {
+	.driver       = { .name = "excalibur-control-center" },
+	.id_table     = excalibur_control_center_id_table,
+	.probe        = excalibur_control_center_probe,
 	.no_singleton = true,
 };
 
-module_wmi_driver(excalibur_wmi_driver);
+module_wmi_driver(excalibur_control_center_driver);
