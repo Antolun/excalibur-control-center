@@ -1,8 +1,6 @@
-# This project is no longer in development!
+# Excalibur-VMI Driver for LupuS
 
 ### NOTE: If your computer's brand is Excalibur, LupuS will automatically install this driver!
-
-# Excalibur-VMI Driver for LupuS
 
 <img src="https://i.imgur.com/b5ziXad.png">
 Linux kernel WMI driver for Excalibur gaming laptops.  
